@@ -26,6 +26,12 @@ def getemail(search_string):
     except:
         return('')
 
+def html_to_text(html):
+    text=html[0]+html[1:]
+    for i in ['<p>','</p>','<html>','<head>','</body>','</html>']:
+        text=text.replace(i,'')
+    return(text)
+
 def mailthis(recipientlist,cc, df, subject,obj):
     outlook = win32.Dispatch('outlook.application')
     mail = outlook.CreateItem(0)
@@ -103,18 +109,21 @@ def mailthat(subject,to=None,cc=None,bcc=None,text=None,html=None,atch=None):
 
     mail.OriginatorDeliveryReportRequested = True       
     if not text:
-        text = """Good Day,
-        
-        Attached find your reappointment letter for January. Please read it completely before signing, indicating either acceptance of the reappointment or denial of same, and return via e-mail as an attachment, preferably with the original filename or with your name in the filename. You may return the signed letter to Ms. Annie Jackson if you are a College Assistant or to Ms. Marilyn Williams if you are another classified hourly title. Please note that opening this document in a web browser like Chrome may display it without details such as your Name, Rate, or Title. Please open in Adobe for best results. 
-        
-        Best Regards, 
-        Shane Ayers
-        
-        Human Resources Information Systems Manager
-        Office of Human Resources
-        York College
-        The City University of New York
-        """
+        if html:
+            text=html_to_text(html)
+        else:
+            text = """Good Day,
+            
+            Attached find your reappointment letter for January. Please read it completely before signing, indicating either acceptance of the reappointment or denial of same, and return via e-mail as an attachment, preferably with the original filename or with your name in the filename. You may return the signed letter to Ms. Annie Jackson if you are a College Assistant or to Ms. Marilyn Williams if you are another classified hourly title. Please note that opening this document in a web browser like Chrome may display it without details such as your Name, Rate, or Title. Please open in Adobe for best results. 
+            
+            Best Regards, 
+            Shane Ayers
+            
+            Human Resources Information Systems Manager
+            Office of Human Resources
+            York College
+            The City University of New York
+            """
     if not html:
         html = """
         <html>
