@@ -1,6 +1,8 @@
 from re import search
 import win32com.client as win32
 from tabulate import tabulate
+import pythoncom
+
 def getemail(search_string):
     try:    
         search_string = str(search_string)
@@ -25,12 +27,6 @@ def getemail(search_string):
         return(email_address)
     except:
         return('')
-
-def html_to_text(html):
-    text=html[0]+html[1:]
-    for i in ['<p>','</p>','<html>','<head>','</body>','</html>']:
-        text=text.replace(i,'')
-    return(text)
 
 def mailthis(recipientlist,cc, df, subject,obj):
     outlook = win32.Dispatch('outlook.application')
@@ -86,15 +82,25 @@ def mailthis(recipientlist,cc, df, subject,obj):
         mail.Attachments.Add(obj)
     mail.Send()
     
-def mailthat(subject,to=None,cc=None,bcc=None,text=None,html=None,atch=None):
+def mailthat(subject,to=None,cc=None,bcc=None,acc=None,text=None,html=None,atch=None,disp=None,temp=None,recp=None,deli=None):
+    """
+    This function has only subject as the required argument. 
+    All other arguments are optional. to,cc, and bcc are self-explanatory.
+    acc gives the option to use something other than the default account.
+    text and html are self explanatory but text is not required if html is provided.
+    atch is the full file location of any desired attachment(s)
+    disp is option to open the e-mails for display *instead* of than sending.
+    temp is an optional argument to work from a template or create a new item
+    temp is file location of template.
+    recp is optional read receipts, anything can go in this field
+    deli is optional delivery receipts, anything can go in this field
+    """
     
     outlook = win32.Dispatch('outlook.application')
-#    oacctouse = acc
-#    for oacc in outlook.Session.Accounts:
-#        if oacc.SmtpAddress == "humanresources@york.cuny.edu":
-#            oacctouse = oacc
-#            break
-    mail = outlook.CreateItem(0)
+    if temp:
+        mail=outlook.CreateItemFromTemplate(temp)
+    else:
+        mail = outlook.CreateItem(0)
     if to:
         mail.To = to
     if cc:
@@ -102,28 +108,25 @@ def mailthat(subject,to=None,cc=None,bcc=None,text=None,html=None,atch=None):
     if bcc:
         mail.BCC = bcc
     mail.Subject = subject
-#    mail.SendUsingAccount = acc
-    mail.ReadReceiptRequested = True
-#    if oacctouse:
-#        mail._oleobj_.Invoke(*(64209, 0, 8, 0, oacctouse))  # Msg.SendUsingAccount = oacctouse
-
-    mail.OriginatorDeliveryReportRequested = True       
+    if acc:
+        mail.SendUsingAccount = acc
+    if recp:
+        mail.ReadReceiptRequested = True
+    if deli:
+        mail.OriginatorDeliveryReportRequested = True       
     if not text:
-        if html:
-            text=html_to_text(html)
-        else:
-            text = """Good Day,
-            
-            Attached find your reappointment letter for January. Please read it completely before signing, indicating either acceptance of the reappointment or denial of same, and return via e-mail as an attachment, preferably with the original filename or with your name in the filename. You may return the signed letter to Ms. Annie Jackson if you are a College Assistant or to Ms. Marilyn Williams if you are another classified hourly title. Please note that opening this document in a web browser like Chrome may display it without details such as your Name, Rate, or Title. Please open in Adobe for best results. 
-            
-            Best Regards, 
-            Shane Ayers
-            
-            Human Resources Information Systems Manager
-            Office of Human Resources
-            York College
-            The City University of New York
-            """
+        text = """Good Day,
+        
+        Attached find your reappointment letter for January. Please read it completely before signing, indicating either acceptance of the reappointment or denial of same, and return via e-mail as an attachment, preferably with the original filename or with your name in the filename. You may return the signed letter to Ms. Annie Jackson if you are a College Assistant or to Ms. Marilyn Williams if you are another classified hourly title. Please note that opening this document in a web browser like Chrome may display it without details such as your Name, Rate, or Title. Please open in Adobe for best results. 
+        
+        Best Regards, 
+        Shane Ayers
+        
+        Human Resources Information Systems Manager
+        Office of Human Resources
+        York College
+        The City University of New York
+        """
     if not html:
         html = """
         <html>
@@ -148,4 +151,8 @@ def mailthat(subject,to=None,cc=None,bcc=None,text=None,html=None,atch=None):
     #To attach a file to the email (optional):
     if atch:
         mail.Attachments.Add(atch)
-    mail.Send()
+    #to display the e-mail on screeen rather than sending
+    if disp:
+        mail.Display(False)
+    else:
+        mail.Send()
