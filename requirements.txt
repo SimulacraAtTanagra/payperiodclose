@@ -1,0 +1,6 @@
+pywin32==228
+pandas==0.24.0
+fuzzywuzzy==0.18.0
+openpyxl==3.0.7
+pycryptodome==3.10.1
+tabulate==0.8.9
