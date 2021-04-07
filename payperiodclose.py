@@ -2,11 +2,11 @@ import openpyxl
 import pandas as pd
 import re
 import os
-from datetime import datetime 
+from datetime import datetime,timedelta
 import win32com.client as win32
 from tabulate import tabulate
-from src.admin import newest, colclean
-from src.emailautosend import mailthat
+from admin import newest, colclean
+from emailautosend import mailthat
 
 #TODO encapsulate code into main function
 #TODO add function to handle npay502 files
@@ -23,6 +23,11 @@ datedict={27:27, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5,
  24: 16, 25: 17, 26: 18, 1: 19, 2: 20, 3: 21, 4: 22, 5: 23, 6: 24, 7: 25, 8: 26}
 rdatedict={v:k for k,v in datedict.items()}
 
+
+#x=[i for i in range(9,27)]
+#x.extend([i for i in range(1,9)])
+#y=[i for i in range(1,27)]
+#ppdict={a:y[ia] for ia,a in enumerate(x)}
 
 def data_collect(path,fname,itera=None):
     if itera:
@@ -46,21 +51,23 @@ def convert_pp(df):
     df['pr']=df.pr.apply(lambda x: datedict[x])
     period=int(df.pr.max())
     period= rdatedict[period]
-    return(df)
+    return(period)
 
 def rename_file(path,fname,df,path2=None):  #leaving option for renaming in other location
     if path2:
         path2=path2
     else:
         path2=path
+    period=convert_pp(df)
+    year=int(datetime.now().strftime("%Y"))[2:]
     #TODO fix this filename hardcoding
     if df[(df.title.isnull()==False)&(df.title.str.contains('Adj'))].shape[0] > 0:
         if df[(df.ps_emp_id.isnull()==True)].shape[0] >0:
-            newpath = os.path.join(path2,str(f'aems pp {period} 21.xls'))
+            newpath = os.path.join(path2,str(f'aems pp {period} {year}.xls'))
             os.rename(os.path.join(path,fname),newpath)
     else:
         if df[(df.ps_emp_id.isnull()==True)].shape[0] >0:
-            newpath = os.path.join(path2,str(f'pr pp {period○} 21.xls'))
+            newpath = os.path.join(path2,str(f'pr pp {period} {year}.xls'))
             os.rename(os.path.join(path,fname),newpath)
 
 def processing_npay(path,frames,path2=None):
@@ -110,7 +117,7 @@ def npaysend(path):
     to='University_Payroll_Interface_Processing@cuny.edu;'
     cc='adavis901@york.cuny.edu;'
     bcc=''
-    subject=obj.split('\\')[-1].split('.')[0]
+    subject=obj.split('\\')[-1].split('.')[0][:-4]
     #this is the part where you use the file both as attachment and as subject
     mailthat(subject,to=to,cc=cc,bcc=bcc,text=text,html=html,atch=obj)
     #plus custom string for send function
@@ -132,65 +139,64 @@ def processing_pp(path,frames,path2=None):  #finds missing, renames files, retur
         missin_n=df[df.title == "xyz"]
         missin_n = missin_n.append(df[(df.ps_emp_id.isnull()==True)])
         missin_n=list(missin_n['name','title','empl_id'].to_records(index=False))
-        missing_ns.extend(missing_n)
+        missing_ns.extend(missin_n)
         rename_file(path,fnames[ix],df,path2=path2)
     df = pd.DataFrame(missing_ns, columns =['name','title','empl_id']) 
     df = df[(df.empl_id.isnull()==False)].astype({"empl_id": int})
     dframes.append(df)
     return(dframes) #a list of dataframes at least 2 items long
-def npay_send(path):  
-    fname=newest(path,'NPAY')
-
 
 #TODO encapsulate this send function. Use class(h) letter file as example  
-outlook = win32.Dispatch('outlook.application')
-mail = outlook.CreateItem(0)
-#TODO read these from a dictionary stored in json
-if df[(df.title.isnull()==False)&(df.title.str.contains('Adj'))].shape[0] > 0:
-    mail.To = 'jamican@york.cuny.edu;hgordon@york.cuny.edu;adavis901@york.cuny.edu'
-else:
-    mail.To = 'jamican@york.cuny.edu;hgordon@york.cuny.edu;adavis901@york.cuny.edu;bmajor@york.cuny.edu'
-mail.Subject = "Pay period close"
+def sendfunc(df):
+    outlook = win32.Dispatch('outlook.application')
+    mail = outlook.CreateItem(0)
+    #TODO read these from a dictionary stored in json
+    sendlist='jamican@york.cuny.edu;hgordon@york.cuny.edu;adavis901@york.cuny.edu;eford1@york.cuny.edu'
+    if df[(df.title.isnull()==False)&(df.title.str.contains('Adj'))].shape[0] > 0:
+        sendlist=sendlist
+    else:
+        sendlist = sendlist+';bmajor@york.cuny.edu'
+    mail.Subject = "Pay period close"
+    
+    mail.To=sendlist
+    
+    text = """{table}"""
+    
+    html = """
+    <html>
+    <head>
+    <style>     
+     table, th, td {{ border: 1px solid black; border-collapse: collapse; }}
+      th, td {{ padding: 10px; }}
+    </style>
+    </head>
+    <p>{table}<p>
+    <p>Best Regards,</p>
+    <p>Shane Ayers</p>
+    <p>Acting Human Resources Information Systems Manager</p>
+    <p>Office of Human Resources</p>
+    <p>York College</p>
+    <p>The City University of New York</p>
+    </body></html>
+    """
+    
+            
+    # above line took every col inside csv as list
+    try:
+        text = text.format(table=tabulate(missin_n, headers=(list(missin_n.columns.values)), tablefmt="grid"))
+        html = html.format(table=tabulate(missin_n, headers=(list(missin_n.columns.values)), tablefmt="html"))
+    except:
+        pass
+    mail.Body = text
+    mail.HTMLBody = html
+    #To attach a file to the email (optional):
+    
+    attachment  = newpath
+    mail.Attachments.Add(attachment)
+    mail.Send()
 
+path = "S:\\Downloads\\"     # Give the location of the file      
+npaypay=r'Y:\Reports\NPAY files\Processed\2021'   
 
-x=[i for i in range(9,27)]
-x.extend([i for i in range(1,9)])
-y=[i for i in range(1,27)]
-ppdict={a:y[ia] for ia,a in enumerate(x)}
-
-text = """{table}"""
-
-html = """
-<html>
-<head>
-<style>     
- table, th, td {{ border: 1px solid black; border-collapse: collapse; }}
-  th, td {{ padding: 10px; }}
-</style>
-</head>
-<p>{table}<p>
-<p>Best Regards,</p>
-<p>Shane Ayers</p>
-<p>Acting Human Resources Information Systems Manager</p>
-<p>Office of Human Resources</p>
-<p>York College</p>
-<p>The City University of New York</p>
-</body></html>
-"""
-
-        
-# above line took every col inside csv as list
-try:
-    text = text.format(table=tabulate(missin_n, headers=(list(missin_n.columns.values)), tablefmt="grid"))
-    html = html.format(table=tabulate(missin_n, headers=(list(missin_n.columns.values)), tablefmt="html"))
-except:
-    pass
-mail.Body = text
-mail.HTMLBody = html
-#To attach a file to the email (optional):
-
-attachment  = newpath
-mail.Attachments.Add(attachment)
-mail.Send()
-
-path = "S:\\Downloads\\"     # Give the location of the file         
+#ef main():
+    
